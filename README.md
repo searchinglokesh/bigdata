@@ -320,7 +320,9 @@ A: HDFS has built-in error handling mechanisms:
    - Verifies checksums for all data transfers
    - Reports corrupted blocks to NameNode
    - Attempts to read from alternative replicas
-How does Hadoop Cluster File Writing Happen?
+  
+   
+### How does Hadoop Cluster File Writing Happen?
 1. **Client Creates the File**:
    - The client calls the `create()` method on the DistributedFileSystem (DFS) to create a new file.
 
