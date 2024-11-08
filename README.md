@@ -80,12 +80,16 @@ A: HDFS (Hadoop Distributed File System) is a distributed file system designed f
 ### Q: How does HDFS handle file reading?
 A: The file reading process follows these steps:
 
-1. Client initiates by calling `open()` on FileSystem object
-2. NameNode provides block locations via RPC
-3. Client establishes connection with nearest DataNode
-4. Data streams directly from DataNode to client
-5. Process continues block by block
-6. Client closes stream when finished
+1) The client opens the file it needs by calling open() on the FileSystem object.
+2) DFS calls the namenode using RPC, to determine the location of blocks for the first few blocks in the file.
+-For each block the namenode returns the addresses of the datanodes that have a copy of that block
+-If the client itself is a datanode then it will read from local DaataNode
+3) The client then calls read() on stream.(DFSInputStream which has stored the datanode addresses for the first few blocks in the file, connects to the first datanode for the first block in the file.
+4) Data is streamed from datanode back to client which calls read() repeatedly.
+5) When the end of data block is reached ,DFSInputStream will close the connection to the datanode,then find the best datanode for the next block
+-Blocks are read in order with DFSInputStream opening new connections to datanodes as the client reads through the stream.
+6) When client has finished reading - calls close() on the FSDataInputStream
+
 
 ### Q: How does HDFS handle file writing?
 A: The file writing process involves:
