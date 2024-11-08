@@ -91,27 +91,57 @@ A: The file reading process follows these steps:
 6) When client has finished reading - calls close() on the FSDataInputStream
 
 
-### Q: How does HDFS handle file writing?
-A: The file writing process involves:
+### How does Hadoop Cluster File Writing Happen?
+1. **Client Creates the File**:
+   - The client calls the `create()` method on the DistributedFileSystem (DFS) to create a new file.
 
-1. **Initialization**:
-   - Client creates file using `create()`
-   - NameNode verifies permissions and file existence
+2. **NameNode Namespace Operations**:
+   - The DistributedFileSystem makes Remote Procedure Call (RPC) requests to the 
+NameNode to create the new file in the Hadoop Distributed File System (HDFS) namespace.
+   - The NameNode performs various checks:
+     - It verifies that the file doesn't already exist in the namespace.
+     - It checks that the client has the necessary permissions to create the file.
+   - If all the checks pass, the NameNode makes a record of the new file in the namespace.
+ If any check fails, the NameNode throws an IOException.
 
-2. **Data Flow**:
-   - Data split into packets
-   - Packets queued for writing
-   - Pipeline of DataNodes established
+3. **FSDataOutputStream Creation**:
+   - After the file is created in the namespace, the DistributedFileSystem returns an `FSDataOutputStream`
+ to the client.
+   - The `FSDataOutputStream` is a wrapper around a `DFSOutputStream`, which handles the
+ communication with the DataNodes and NameNode.
+ **Data Packet Handling**:
+   - The `FSDataOutputStream` splits the data being written by the client into smaller packets.
+   - These packets are written to an internal queue called the data queue.
 
-3. **Writing Process**:
-   - Data streams through DataNode pipeline
-   - Each DataNode stores and forwards
-   - Acknowledgments sent back through pipeline
+ **Block Allocation by the NameNode**:
+   - The Data Streamer is responsible for consuming the data queue and asking the NameNode
+ to allocate new blocks for the file.
+   - The NameNode selects a list of suitable DataNodes to store the replicas of the new blocks.
+   - This list of DataNodes forms a pipeline for the data transfer.
 
-4. **Completion**:
-   - Client calls `close()`
-   - NameNode confirms completion
-   - Block replication verified
+4. **Data Transfer to DataNodes**:
+   - The Data Streamer streams the data packets to the first DataNode in the pipeline.
+   - The first DataNode stores the packet and forwards it to the second DataNode in the pipeline.
+   - This process continues until the packet reaches the last DataNode in the pipeline.
+
+5. **Acknowledgment Handling**:
+   - The `DFSOutputStream` maintains another internal queue called the ack queue, which stores
+ the packets waiting to be acknowledged by the DataNodes.
+   - A packet is removed from the ack queue only when it has been successfully acknowledged by 
+all the DataNodes in the pipeline.
+
+6. **File Closure**:
+   - When the client has finished writing data, it calls the `close()` method on the `FSDataOutputStream`.
+   - This action flushes any remaining packets to the DataNode pipeline and waits for acknowledgments.
+   - After all the packets have been acknowledged, the client contacts the NameNode to signal that the file
+ is complete.
+
+7. **NameNode Finalization**:
+   - The NameNode already knows which blocks the file is made of, as it was involved in the block 
+allocation process.
+   - The NameNode only waits for the blocks to be minimally replicated (based on the configured
+ replication factor) before returning successfully to the client.
+
 
 ### Q: How does HDFS handle failures during writing?
 A: HDFS handles writing failures through:
